@@ -18,7 +18,7 @@ editor: visual
 
 ## Set Up
 
-```{r}
+```{r, message=F, warning=FALSE}
 # Packages ---------------------------------------------------------------
 # (uncomment next 2 lines if you want auto-install)
 # pkgs <- c("leaflet","terra","sf","leafem","raster")
@@ -36,14 +36,15 @@ library(smoothr)
 library(dplyr)
 library(gdistance)
 library(readxl)
+library(here)    # find files needed
 ```
 
 ## Read Data
 
 ```{r}
-coralSDM.Ahya <- terra::rast("data/maxent_predrast_GBR_AhyaD_015_lq2.tif")
-coralSDM.Aspat <- terra::rast("data/maxent_predrast_GBR_Aspat_015_lq2.tif")
-coralSDM.Aten <- terra::rast("data/maxent_predrast_GBR_Aten_015_lq2.tif")
+coralSDM.Ahya <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/maxent_predrast_GBR_AhyaD_015_lq2.tif")
+coralSDM.Aspat <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/maxent_predrast_GBR_Aspat_015_lq2.tif")
+coralSDM.Aten <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/maxent_predrast_GBR_Aten_015_lq2.tif")
 crs(coralSDM.Ahya)
 #John Brewer
 bb_wgs <- ext(147.0, 147.1, -18.66, -18.6)
@@ -64,9 +65,9 @@ plot(coralSDM.Aten_crop)
 ```
 
 ```{r Read in Raster}
-coralSDM.Ahya  <- rast("data/maxent_predrast_GBR_AhyaD_015_lq2.tif")
-coralSDM.Aspat <- rast("data/maxent_predrast_GBR_Aspat_015_lq2.tif")
-coralSDM.Aten  <- rast("data/maxent_predrast_GBR_Aten_015_lq2.tif")
+#coralSDM.Ahya  <- rast("data/maxent_predrast_GBR_AhyaD_015_lq2.tif")
+#coralSDM.Aspat <- rast("data/maxent_predrast_GBR_Aspat_015_lq2.tif")
+#coralSDM.Aten  <- rast("data/maxent_predrast_GBR_Aten_015_lq2.tif")
 
 crs(coralSDM.Ahya)
 crs(coralSDM.Aspat)
@@ -75,7 +76,7 @@ crs(coralSDM.Aten)
 
 # list the 30 m rasters
 env_files <- list.files(
-  "data/GBR_bathymetryDEM_ACA_UTM55_030_crop",
+  "C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR_bathymetryDEM_ACA_UTM55_030_crop",
   pattern = "\\.tif$",
   full.names = TRUE
 )
@@ -86,28 +87,28 @@ env30
 # Check CRS
 crs(env30)
 
-#Geomorphic and Benthic Data
-geomorph_rast <- rast("data/GBR10_GBRMP_Geomorphic/GBR10 GBRMP Geomorphic.tif")
-benthic_rast <- rast("data/GBR10_GBRMP_Benthic/GBR10 GBRMP Benthic.tif")
-crs(geomorph_rast); crs(benthic_rast)
-# project/align to predictor grid
-benthic_rast <- project(benthic_rast, predictors_reef[[1]], method = "near")
-geomorph_rast <- project(geomorph_rast, predictors_reef[[1]], method = "near")
-benthic_rast <- resample(benthic_rast, predictors_reef[[1]], method = "near")
-geomorph_rast <- resample(geomorph_rast, predictors_reef[[1]], method = "near")
-names(benthic_rast) <- "benthic_class"
-names(geomorph_rast) <- "geomorph_class"
-# add to predictor stack
-predictors_reef <- c(predictors_reef, benthic_rast, geomorph_rast)
+# Create res 50 dataset for env30
+
 
 ```
 
+```{r add Turbidity Data from Allen Coral Atlas}
+turb <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR Turbidity data/Turbidity-2024/turbidity-annual_0.tif")
+crs(turb)
+
+if (crs(turb) != crs(coralSDM.Ahya)) {
+  message("Reprojecting reef polygons to raster CRS...")
+  turb <- terra::project(turb, crs(coralSDM.Ahya))
+}
+
+crs(turb) # check ok
+plot(turb)
+```
+
+Only 2024 Turbidity Data Available from Allen Coral Atlas
 ### Need to add in ReefGuide data
 
-
-
 ## Create Template Grid
-
 
 ```{r Create Template Grid}
 template30 <- env30[[1]]
@@ -126,6 +127,12 @@ all.equal(crs(Aspat_30), crs(template30))
 all.equal(crs(Aten_30),  crs(template30))
 res(Ahya_30); res(template30)
 
+#Align turbidity data:
+turb_30 <- resample(turb,template30, method = "bilinear")
+
+res(turb_30); res(template30) # check turbidity
+all.equal(crs(turb_30),  crs(template30))
+
 # keep env layers separate if you like
 names(env30)  # rename if needed to sensible names
 
@@ -137,15 +144,55 @@ predictors_terra
 
 library(raster)
 
-predictors_raster <- raster::stack(c(env30, coral_sdm_30))
-predictors_raster
+predictors_raster <- raster::stack(c(env30, coral_sdm_30,turb_30))
+plot(predictors_raster[[13]])
+```
 
+```{r Create John Brewer Template Grid, include=FALSE}
+template30 <- env30[[1]]
+res(template30)   # should be ~30 m
+ext(template30)
+crs(template30)   # should now be EPSG:7855
+
+# Align resolution/extent to the 30 m template
+Ahya_30_crop  <- resample(coralSDM.Ahya_crop,  template30, method = "bilinear")
+Aspat_30_crop <- resample(coralSDM.Aspat_crop, template30, method = "bilinear")
+Aten_30_crop  <- resample(coralSDM.Aten_crop,  template30, method = "bilinear")
+
+#Align turbidity data:
+jb_turb_30 <- resample(jb_turb,template30, method = "bilinear") %>% 
+  crop(.,bb_mga_poly)
+
+
+all.equal(crs(Ahya_30_crop),  crs(template30))
+all.equal(crs(Ahya_30_crop), crs(template30))
+all.equal(crs(Ahya_30_crop),  crs(template30))
+res(Ahya_30_crop); res(template30)
+
+res(jb_turb_30); res(template30) # check turbidity
+all.equal(crs(jb_turb_30),  crs(template30))
+
+# keep env layers separate if you like
+names(env30)  # rename if needed to sensible names
+
+# recrop env30 for JB:
+env30_jb <- crop(env30,bb_mga_poly)
+
+coral_sdm_30_crop <- c(Ahya_30_crop, Aspat_30_crop, Aten_30_crop)
+names(coral_sdm_30_crop) <- c("SDM_Ahya_crop", "SDM_Aspat_crop", "SDM_Aten_Crop")
+coral_sdm_30_crop <- crop(coral_sdm_30_crop, bb_mga_poly)
+
+predictors_terra_crop <- c(env30_jb, coral_sdm_30_crop)
+predictors_terra_crop
+
+predictors_raster_crop <- raster::stack(c(env30_jb, coral_sdm_30_crop, jb_turb_30))
+plot(predictors_raster_crop)
 
 ```
 
 ##Mask Rasters to GBR Features
 
-```{r}
+```{r John Brewer plot}
 ############################################################
 # Mask full predictor stack to reef polygons
 # - GeoPackage: "data/Great_Barrier_Reef_Features.gpkg"
@@ -161,8 +208,9 @@ library(tidyterra)
 ## 1. Read reef polygons -----------------------------------
 
 # Option 1: if there's only one layer in the GeoPackage
-reef_poly <- terra::vect("data/Great_Barrier_Reef_Features.gpkg") |>
-  filter(FEAT_NAME=="Reef")
+reef_poly <- terra::vect("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/Great_Barrier_Reef_Features.gpkg") |>
+  filter(FEAT_NAME=="Reef") # <:changed filepath to suit me 
+
 attr_reefs <- as.data.frame(reef_poly)
 
 # Option 2: if there are multiple layers and you know the layer name:
@@ -197,10 +245,12 @@ plot(predictors_terra[[12]], main = "Predictor unmasked")
 # # First crop to the reef polygon extent – faster than masking full GBR
 predictors_reef_crop <- terra::crop(predictors_terra, reef_poly)
 plot(predictors_terra[[12]], main = "Predictor cropped")
+
+
 # Then apply mask: cells OUTSIDE reef polygons become NA
 predictors_reef <- terra::mask(predictors_terra, reef_poly)
 
-# Quick visual check of one layer
+
 plot(predictors_reef[[1]], main = "Predictor masked to reef areas")
 plot(predictors_reef[[12]], main = "Predictor masked to reef areas")
 
@@ -209,21 +259,48 @@ plot(predictors_reef[[12]], main = "Predictor masked to reef areas")
 predictors_reef
 names(predictors_reef)
 
+#make res coarser to 50m
+res(predictors_reef) <- 50
+
+#Geomorphic and Benthic Data
+geomorph_rast <- rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR10_GBRMP_Geomorphic/GBR10 GBRMP Geomorphic.tif")
+benthic_rast <- rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR10_GBRMP_Benthic/GBR10 GBRMP Benthic.tif")
+crs(geomorph_rast); crs(benthic_rast)
+# project/align to predictor grid
+benthic_rast <- project(benthic_rast, predictors_reef[[1]], method = "near")
+geomorph_rast <- project(geomorph_rast, predictors_reef[[1]], method = "near")
+benthic_rast <- resample(benthic_rast, predictors_reef[[1]], method = "near")
+geomorph_rast <- resample(geomorph_rast, predictors_reef[[1]], method = "near")
+names(benthic_rast) <- "benthic_class"
+names(geomorph_rast) <- "geomorph_class"
+
+
+# add to predictor stack
 predictors_reef <- c(predictors_reef, benthic_rast, geomorph_rast)
 
 # Save to disk as a multi-band GeoTIFF
 writeRaster(
   predictors_reef,
-  filename = "data/predictors_reef.tif",
+  filename = "predictors_reef.tif",
   overwrite = TRUE,
   gdal = c("COMPRESS=LZW")  # optional compression
 )
 ```
-
-
+Is this the owen dataset??
 
 ```{r Load survey data}
-dat.cull <- read_excel("data/250929_COTS-Manta-Cull-RHIS-Data-Matthews-and-Schlawinsky.xlsx", sheet = 4) |>
+#here::i_am("predictors_reef.tif")
+#here()
+
+# Quick load of predictors_reef:
+predictors_reef <- terra::rast("predictors_reef.tif")
+names(predictors_reef) <- c("benthic_class", "geomorphic_class")
+
+plot(predictors_reef)
+
+dat.cull <- read_excel(
+  #"250929_COTS-Manta-Cull-RHIS-Data-Matthews-and-Schlawinsky.xlsx", sheet = 4)
+  "C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/COTS-Manta-Cull-Data-Stewart.xlsx", sheet = 4)|>
   mutate(VoyageTitle = as.factor(VoyageTitle),
          YearQr = zoo::as.yearqtr(SurveyDate),
          Year = lubridate::year(SurveyDate),
@@ -247,11 +324,107 @@ plot(dat.cull_sf)
 # Your predictor rasters are in EPSG:7844 (GDA2020 geographic),
 # so we transform the survey points to that CRS:
 survey_sf <- dat.cull_sf |> st_transform(7844)
-
 ```
 
+MARC: the above chunk essentially means that we need to interpolate the data there. perhaps an `if()` function? If `NA` is shown in `resample()`, use `update(method = "ngb)`? Think about how to write this for loop.
+
+Other option is to add 10 to the sample range each time it misses?
+
+Also, John Brewer is not in the missing samples...Pick another reef?
+
+**From Sam: plot using `leaflet()` to check how far apart the NAs are**
+
+record NAs, have a look at distribution using histogram and summary stats
+`gdist()`
+
+<IGNORE CHUNK BELOW>
+```{r reef predictors filtered, include = F}
+
+#JB predictors 
+predictors_raster
+
+predictors_reef <- terra::mask(predictors_terra_crop, reef_poly)
+
+plot(predictors_reef_jb)
+
+benthic_rast_jb <- project(benthic_rast, predictors_reef_jb[[1]], method = "near")
+geomorph_rast_jb <- project(geomorph_rast, predictors_reef_jb[[1]], method = "near")
+benthic_rast_jb <- resample(benthic_rast, predictors_reef_jb[[1]], method = "near")
+geomorph_rast_jb <- resample(geomorph_rast, predictors_reef_jb[[1]], method = "near")
+names(benthic_rast_jb) <- "benthic_class"
+names(geomorph_rast_jb) <- "geomorph_class"
+# add to predictor stack
+predictors_reef_jb <- c(predictors_reef_jb, benthic_rast_jb, geomorph_rast_jb)
+names(predictors_reef_jb)
+
+plot(benthic_rast_jb)
+plot(geomorph_rast_jb)
 
 
+# Try to resample at 50m:
+res(predictors_reef_jb) <- 50
+
+benthic_rast_jb <- terra::resample(benthic_rast, predictors_reef_jb[[1]], method = "near")
+geomorph_rast_jb <- terra::resample(geomorph_rast, predictors_reef_jb[[1]], method = "near")
+
+plot(geomorph_rast_jb)
+
+dat.cull_jb <- dat.cull %>% filter(ReefName %in% "John Brewer Reef (18-075)")
+
+dat.cull_jb_sf <- dat.cull_jb %>%  
+  st_as_sf(
+    coords = c("Longitude", "Latitude"),  # <- CHANGE if your cols are named differently
+    crs    = 4326              # WGS84 geographic
+  )
+
+# so we transform the survey points to that CRS:
+survey.jb_sf <- dat.cull_jb_sf |> st_transform(7844)
+
+plot(survey.jb_sf)
+
+survey.jb_sf <- survey.jb_sf %>%
+  mutate(
+    cots_density_cpue = as.numeric(CPUE),
+    # Binary target: 1 = problematic density, 0 = below threshold
+    cots_problem = if_else(cots_density_cpue >= problem_threshold, 1L, 0L)
+  )
+
+survey.jb_sf <- st_transform(survey.jb_sf, crs(geomorph_rast_jb))
+
+# 3.3 Extract raster values
+pred_vals <- terra::extract(predictors_reef_jb, vect(survey.jb_sf))
+
+# Try to resample at 100m:
+res(predictors_reef_jb) <- 100
+
+benthic_rast_jb <- terra::resample(benthic_rast, predictors_reef_jb[[1]], method = "near")
+geomorph_rast_jb <- terra::resample(geomorph_rast, predictors_reef_jb[[1]], method = "near")
+
+plot(geomorph_rast_jb)
+
+survey.jb_sf <- st_transform(survey.jb_sf, crs(geomorph_rast_jb))
+
+# 3.3 Extract raster values
+pred_vals <- terra::extract(predictors_reef_jb, vect(survey.jb_sf))
+
+#interative map
+map1 <- leaflet() %>% 
+  addProviderTiles(providers$Esri.OceanBasemap, group = "Esri Ocean") %>% 
+  addProviderTiles(providers$Esri.WorldImagery, group = "Esri Satellite") %>% 
+  addProviderTiles(providers$CartoDB.Positron,  group = "Light") %>% 
+  addRasterImage(benthic_rast_jb, group = "Benth") %>% 
+  addRasterImage(geomorph_rast_jb, group = "Geo") %>% 
+  addLayersControl( baseGroups= c("Esri Ocean", "Esri Satellite", "Light"),
+                    overlayGroups = c("Benth", "Geo","sample sites"),
+                    options = layersControlOptions(collapsed = FALSE))%>% 
+  leafem::addMouseCoordinates() %>% 
+  addScaleBar(position = "bottomright")
+
+
+map1
+
+print(is.na(geomorph_rast_jb$geomorph_class))
+```
 
 ```{r}
 ############################################################
@@ -272,6 +445,10 @@ library(tidymodels)   # modelling framework
 library(blockCV)      # spatial CV
 library(ggplot2)      # plotting (optional)
 library(xgboost)      # xgboost engine for parsnip
+
+# Marc's packages
+library(tictoc)       # timing runs
+library(future)       # pralllel processing to save time (thanks Owen)
 
 tidymodels::tidymodels_prefer()
 
@@ -319,30 +496,116 @@ survey_sf <- survey_sf %>%
 # 3.1 Ensure CRSs match (project survey_sf to raster CRS if needed)
 survey_sf <- st_transform(survey_sf, crs(predictors_reef))
 
+ #### There are NAs here from Sam ####
 
 # 3.2 Add explicit ID for safe joining
 survey_sf$ID <- seq_len(nrow(survey_sf))
 
 # 3.3 Extract raster values
 pred_vals <- terra::extract(predictors_reef, vect(survey_sf))
+colnames(pred_vals)[2:3] <- c("benthic_class", "geomorphic_class")
+
+
+# Infill the raster using spatial interpolation. NAs in benthic_class and geomorph_class
+# count NAs
 
 #Need to add to take predictors that are within ~20m 
 
-#####IM HERE#####
+#####IM HERE (SAM) #####
 
 
 # 'pred_vals' has column 'ID' from the vect() input
 # Join raster predictors back to survey attributes (without geometry)
 coords <- st_coordinates(dat.cull_sf)
 
+
+pred_vals$dist_to_benth <- 0
+pred_vals$dist_to_geo   <- 0
+# Initialize infill columns as NA (they will hold factor levels later)
+pred_vals$infill_benth  <- NA
+pred_vals$infill_geo    <- NA
+
+pnts_vect <- vect(survey_sf) #vectorise survey_sf points
+
+# Infill the geo layer (this first because it has more NAs)
+
+na_geo <- which(is.na(pred_vals$geomorphic_class))
+
+#Note: as.points() is pretty memory heavy
+
+#future::availableCores() # 16 on Marc's computer
+#future::plan(multisession)
+
+tic()
+#future({
+  if(length(na_geo) > 0) {
+  r_pts_geo <- as.points(predictors_reef[["geomorphic_class"]], values=TRUE, na.rm=TRUE) # convert geo to points
+  near_geo  <- nearest(pnts_vect[na_geo, ], r_pts_geo) # find nearest geo class
+  
+  pnts_na_geo <- pnts_vect[na_geo, ] # subset
+    
+  target_pts_geo <- r_pts_geo[near_geo$to_id, ]
+  distances <- distance(pnts_na_geo, target_pts_geo, pairwise = TRUE) # Calculate distances for the NA points
+  within_limit_idx <- which(distances <= 100) # set limit of 100 m
+    
+  if (length(within_limit_idx) > 0) {
+    replacement_labels <- values(target_pts_geo[within_limit_idx, ])[,1] # retrieve geo class if within 100 m
+    original_idx <- na_geo[within_limit_idx]
+    pred_vals$geomorphic_class[original_idx] <- replacement_labels
+    pred_vals$infill_geo[original_idx] <- as.character(replacement_labels)
+    }
+  
+  pred_vals$dist_to_geo[na_geo] <- distances # retrieve all distances just in case
+  }
+#  },
+#  packages = c("terra", "raster", "Matrix"))
+toc() # took about 8 seconds with the plan() function
+
+# potentially clear memory here
+gc()
+
+# Now do benthic layers, see geo layer for comments on each part
+na_benth <- which(is.na(pred_vals$benthic_class))
+
+tic()
+#future({
+if(length(na_benth) > 0) {
+  r_pts_benth <- as.points(predictors_reef[["benthic_class"]], values=TRUE, na.rm=TRUE)
+  near_benth  <- nearest(pnts_vect[na_benth, ], r_pts_benth)
+  
+  pnts_na_benth <- pnts_vect[na_benth, ]
+  
+  target_pts_benth <- r_pts_benth[near_benth$to_id, ]
+  distances_benth <- distance(pnts_na_benth, target_pts_benth, pairwise = TRUE)
+  within_limit_idx_benth <- which(distances_benth <= 100)
+  
+  if (length(within_limit_idx_benth) > 0) {
+    replacement_labels_benth <- values(target_pts_benth[within_limit_idx_benth, ])[,1]
+    original_idx_benth <- na_benth[within_limit_idx_benth]
+    pred_vals$benthic_class[original_idx_benth] <- replacement_labels_benth
+    pred_vals$infill_benth[original_idx_benth]  <- as.character(replacement_labels_benth)
+  }
+  
+  # Assign ALL calculated distances
+  pred_vals$dist_to_benth[na_benth] <- distances_benth
+}
+#},
+#  packages = c("terra", "raster", "Matrix"))
+toc() # just under 4 seconds
+
+# save it just incase
+#write.csv(pred_vals, file = "pred_vals.csv")
+#pred_vals <- read.csv("pred_vals.csv")
+
+# Convert to dataframe
 survey_df <- survey_sf %>%
   st_drop_geometry() %>%
   ungroup() %>%
   mutate(
     x = coords[, 1],
-    y = coords[, 2]
+    y = coords[, 2],
   ) %>%
-  left_join(pred_vals, by = "ID")
+  tidyterra::left_join(.,pred_vals, by = "ID")
 
 # 3.4 Add outbreak / sector-level predictors (if available)
 #     outbreak_pred_df: one row per reef_id & year with extra covariates
@@ -357,9 +620,15 @@ survey_df <- survey_df %>% dplyr::select(-ID)
 
 # Quick check
 glimpse(survey_df)
+#write.csv(survey_df, file = "survey_df.csv")
+#survey_df <- read.csv("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/survey_df.csv")
 
 
-## 4. Spatial blocking for cross-validation -------------------------------
+# How many NAs now?
+sum(is.na(survey_df$benthic_class))
+sum(is.na(survey_df$geomorphic_class))
+
+ ## 4. Spatial blocking for cross-validation -------------------------------
 
 # 4.1 Use the sf object (with geometry) for blockCV
 #     We only need the cots_problem response + geometry here.
@@ -369,7 +638,7 @@ survey_for_blocks <- survey_sf %>%
 # 4.2 Define spatial blocks
 #     - theRange: spatial block size in metres; adjust sensibly (e.g. 50–100 km)
 set.seed(123)
-sb <- spatialBlock(
+sb <- spatialBlock( # This function is deprecated! Please use 'cv_spatial' instead.
   speciesData = survey_for_blocks,
   species     = "cots_problem",
   theRange    = 50000,    # ~50 km blocks (example)
@@ -401,6 +670,7 @@ model_df <- survey_df %>%
     cots_problem,          # classification target
     cots_density_cpue,       # regression target
     ReefName,
+    CullSiteName,
     # sector,
     Year,
     fold_id,
@@ -413,7 +683,9 @@ model_df <- survey_df %>%
 model_df <- model_df %>%
   filter(!is.na(cots_problem), !is.na(cots_density_cpue)) %>%
   drop_na(dplyr::all_of(pred_cols))
+```
 
+```{r}
 # Optional: drop rows with rare / unused factor levels
 model_df <- model_df %>%
   mutate(
@@ -585,15 +857,6 @@ crs(prob_rast)
 writeRaster(
   prob_rast,
   filename = "outputs/COTS_prob_problem.tif",
-  overwrite = TRUE,
-  gdal = c("COMPRESS=LZW")   # optional but makes file smaller
-)
-
-```
-
-```{r Plot confusion nd metrics}
-# -----------------------------------------------------------
-# 1. Get predictions from fitted classification model
 # -----------------------------------------------------------
 
 # --------------------------------------------------
@@ -815,7 +1078,6 @@ ggplot(thr_grid, aes(threshold)) +
 
 ```
 
-
 ```{r Debug Predict}
 class(predictors_reef)
 predictors_reef
@@ -849,11 +1111,6 @@ p_test <- predict(
 head(p_test)
 
 ```
-
-
-
-
-
 
 ```{r Model 2 COTS Density}
 ## 7. Model 2: XGBoost regression (COTS density) -------------------------
@@ -926,7 +1183,6 @@ fit_reg
 collect_metrics(res_reg)
 
 ```
-
 
 ```{r}
 ############################################################
@@ -1028,4 +1284,3 @@ terra::writeRaster(
 )
 
 ```
-
