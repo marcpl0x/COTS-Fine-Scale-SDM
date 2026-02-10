@@ -59,9 +59,9 @@ coralSDM.Ahya_crop <- crop(coralSDM.Ahya, bb_mga_poly)
 coralSDM.Aspat_crop <- crop(coralSDM.Aspat, bb_mga_poly)
 coralSDM.Aten_crop <- crop(coralSDM.Aten, bb_mga_poly)
 
-plot(coralSDM.Ahya_crop)
-plot(coralSDM.Aspat_crop)
-plot(coralSDM.Aten_crop)
+#plot(coralSDM.Ahya_crop)
+#plot(coralSDM.Aspat_crop)
+#plot(coralSDM.Aten_crop)
 ```
 
 ```{r Read in Raster}
@@ -88,24 +88,161 @@ env30
 crs(env30)
 
 # Create res 50 dataset for env30
-
-
 ```
 
 ```{r add Turbidity Data from Allen Coral Atlas}
-turb <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR Turbidity data/Turbidity-2024/turbidity-annual_0.tif")
-crs(turb)
 
-if (crs(turb) != crs(coralSDM.Ahya)) {
-  message("Reprojecting reef polygons to raster CRS...")
-  turb <- terra::project(turb, crs(coralSDM.Ahya))
-}
+# all data from this section turb_[i], was extracted from Allen Coral Atlas custom polygon incorporating Torres Straits as well. 
 
-crs(turb) # check ok
-plot(turb)
+# NOTE: THESE ARE YEARLY AVERAGES
+
+library(tictoc)
+
+# import data
+#turb_19 <- terra::rast("C:/Users/user/OneDrive - James Cook #University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR_TorStr_Turbidity/Turbidi#ty-2019/turbidity-annual_0.tif")
+#turb_20 <- terra::rast("C:/Users/user/OneDrive - James Cook #University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR_TorStr_Turbidity/Turbidity-#2020/turbidity-annual_0.tif")
+#turb_21 <- terra::rast("C:/Users/user/OneDrive - James Cook #University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR_TorStr_Turbidity/Turbidity-#2021/turbidity-annual_0.tif")
+#turb_22 <- terra::rast("C:/Users/user/OneDrive - James Cook #University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR_TorStr_Turbidity/Turbidity-#2022/turbidity-annual_0.tif")
+#turb_23 <- terra::rast("C:/Users/user/OneDrive - James Cook #University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR_TorStr_Turbidity/Turbidity-#2023/turbidity-annual_0.tif")
+#turb_24 <- terra::rast("C:/Users/user/OneDrive - James Cook #University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/GBR_TorStr_Turbidity/Turbidity-#2024/turbidity-annual_0.tif")
+#
+## change names of raster layers
+#names(turb_19) <- c("Turbidity 2019")
+#names(turb_20) <- c("Turbidity 2020")
+#names(turb_21) <- c("Turbidity 2021")
+#names(turb_22) <- c("Turbidity 2022")
+#names(turb_23) <- c("Turbidity 2023")
+#names(turb_24) <- c("Turbidity 2024")
+
+# update CRS to match the SDM ones
+
+#tic()
+#for (i in 19:24) {
+#  var_name <- paste0("turb_", i)
+#  layer_name <- get(var_name)
+#  file_name <- paste0(var_name, ".tif")
+#  
+#  if (crs(layer_name) != crs(coralSDM.Ahya)) {
+#    
+#    message(paste("Reprojecting", var_name, "to match SDM CRS..."))
+#    
+#    z <- project(layer_name, crs(coralSDM.Ahya))
+#    assign(var_name, layer_name)
+#    
+#    writeRaster(
+#      z,
+#      filename = file_name,
+#      overwrite = TRUE,
+#      gdal = c("COMPRESS=LZW")  # optional compression
+#    )
+#  }
+#  else{
+#    message(paste(var_name, "has already been reprojected"))
+#  }
+#}
+#toc() #90142.61 sec elapsed
+
+# Reload the turbidiuty .tif files after reprojecting
+
+turb_19 <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/turb_19.tif")
+
+turb_20 <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/turb_20.tif")
+
+turb_21 <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/turb_21.tif")
+
+turb_22 <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/turb_22.tif")
+
+turb_23 <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/turb_23.tif")
+
+turb_24 <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/turb_24.tif")
+
+
+# combine turbidiity data
+turb_rast <- c(turb_19,turb_20,turb_21, turb_22, turb_23, turb_24)
+#plot(turb_rast)
+
+# Recrop for Sam's report:
+
+turb_crop <- ext(145.8, 148.8, -19.4, -18.1)
+turb_crop_poly <- as.polygons(turb_crop, crs = "EPSG:4326")
+turb_crop_proj <- project(turb_crop_poly, crs(coralSDM.Ahya))
+
+# crop turb_rast
+turb_rast_crop <- terra::crop(turb_rast, turb_crop_proj)
+
+# Quick resample
+template30 <- env30[[1]]
+turb_rast_crop <- resample(turb_rast_crop, template30, method = "bilinear") # template30 in line 221
+turb_rast_crop <- crop(turb_rast_crop, turb_crop_proj)
+res(turb_rast_crop) # check res is 30 x 30
+beepr::beep()
+
+# Write raster just in case
+#writeRaster(
+#  turb_rast_crop,
+#  filename = "turb_rast_crop.tif",
+#  overwrite = TRUE,
+#  gdal = c("COMPRESS=LZW")  # optional compression
+#)
+
+# re-read in raster:
+turb_rast_crop <- terra::rast("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/COTS-Fine-Scale-SDM/DataProcessing/turb_rast_crop.tif")
+
+# leaflet palette for turbidity
+pal <- colorNumeric(
+  palette = "viridis",
+  domain = turb_rast_crop$`Turbidity 2019`
+) # not working
+
+# create leaflet map
+turb_crop_map <- leaflet() %>% 
+  addProviderTiles(providers$Esri.OceanBasemap, group = "Esri Ocean") %>% 
+  addProviderTiles(providers$Esri.WorldImagery, group = "Esri Satellite") %>% 
+  addProviderTiles(providers$CartoDB.Positron,  group = "Light") %>% 
+  addRasterImage(turb_rast_crop[[1]], group = "2019", maxBytes = Inf) %>% 
+  addRasterImage(turb_rast_crop[[2]], group = "2020", maxBytes = Inf) %>% 
+  addRasterImage(turb_rast_crop[[3]], group = "2021", maxBytes = Inf) %>% 
+  addRasterImage(turb_rast_crop[[4]], group = "2022", maxBytes = Inf) %>% 
+  addRasterImage(turb_rast_crop[[5]], group = "2023", maxBytes = Inf) %>% 
+  addRasterImage(turb_rast_crop[[6]], group = "2024", maxBytes = Inf) %>% 
+  addLayersControl(baseGroups= c("Esri Ocean", "Esri Satellite", "Light"),
+                  overlayGroups = c("2019", "2020","2021", "2022","2023", "2024"),
+                  options = layersControlOptions(collapsed = FALSE))%>% 
+  leafem::addMouseCoordinates() %>% 
+  addScaleBar(position = "bottomright")
+
+plot(turb_rast_crop)
+
+library(tidyterra)
+library(ozmaps)
+
+aus <- vect(st_transform(ozmap_data("country"), crs = crs(coralSDM.Ahya)))
+
+aus_tsv <- crop(aus, turb_rast_crop)
+
+tsv_label <- data.frame(
+  lon = 146.816956,
+  lat = -19.258965,
+  label = "Townsville"
+)
+
+turb_crop_gg <- ggplot()+
+  geom_spatvector(data = aus_tsv)+
+  geom_spatraster(data = turb_rast_crop)+
+  geom_point(data = tsv_label,
+             aes(x = lon, y = lat))+
+  geom_label(data = tsv_label,
+             aes(x = lon, y = lat, label = label),
+             vjust = 1.1,
+             hjust = 1.1)+
+  scale_fill_viridis_c( "Turbidity (FNU)" ,na.value = "transparent")+
+  facet_wrap(~lyr,ncol = 2)+
+  theme_classic()
+
+turb_crop_gg
 ```
 
-Only 2024 Turbidity Data Available from Allen Coral Atlas
+
 ### Need to add in ReefGuide data
 
 ## Create Template Grid
@@ -209,7 +346,7 @@ library(tidyterra)
 
 # Option 1: if there's only one layer in the GeoPackage
 reef_poly <- terra::vect("C:/Users/user/OneDrive - James Cook University/CCIP-BR-13-MarcKoh/CCIP-BR-13-MarcKoh/MarcData/Great_Barrier_Reef_Features.gpkg") |>
-  filter(FEAT_NAME=="Reef") # <:changed filepath to suit me 
+  filter(FEAT_NAME=="Reef") # M:changed filepath to suit me 
 
 attr_reefs <- as.data.frame(reef_poly)
 
@@ -537,8 +674,8 @@ na_geo <- which(is.na(pred_vals$geomorphic_class))
 #future::plan(multisession)
 
 tic()
-#future({
-  if(length(na_geo) > 0) {
+
+if(length(na_geo) > 0) {
   r_pts_geo <- as.points(predictors_reef[["geomorphic_class"]], values=TRUE, na.rm=TRUE) # convert geo to points
   near_geo  <- nearest(pnts_vect[na_geo, ], r_pts_geo) # find nearest geo class
   
@@ -558,8 +695,6 @@ tic()
   pred_vals$dist_to_geo[na_geo] <- distances # retrieve all distances just in case
   }
 #  },
-#  packages = c("terra", "raster", "Matrix"))
-toc() # took about 8 seconds with the plan() function
 
 # potentially clear memory here
 gc()
@@ -568,7 +703,6 @@ gc()
 na_benth <- which(is.na(pred_vals$benthic_class))
 
 tic()
-#future({
 if(length(na_benth) > 0) {
   r_pts_benth <- as.points(predictors_reef[["benthic_class"]], values=TRUE, na.rm=TRUE)
   near_benth  <- nearest(pnts_vect[na_benth, ], r_pts_benth)
@@ -589,13 +723,11 @@ if(length(na_benth) > 0) {
   # Assign ALL calculated distances
   pred_vals$dist_to_benth[na_benth] <- distances_benth
 }
-#},
-#  packages = c("terra", "raster", "Matrix"))
-toc() # just under 4 seconds
+toc()
 
 # save it just incase
 #write.csv(pred_vals, file = "pred_vals.csv")
-#pred_vals <- read.csv("pred_vals.csv")
+pred_vals <- read.csv("pred_vals.csv")
 
 # Convert to dataframe
 survey_df <- survey_sf %>%
@@ -605,7 +737,8 @@ survey_df <- survey_sf %>%
     x = coords[, 1],
     y = coords[, 2],
   ) %>%
-  tidyterra::left_join(.,pred_vals, by = "ID")
+  tidyterra::left_join(.,pred_vals, by = "ID") %>% 
+  dplyr::select(!`X`)
 
 # 3.4 Add outbreak / sector-level predictors (if available)
 #     outbreak_pred_df: one row per reef_id & year with extra covariates
@@ -683,6 +816,57 @@ model_df <- survey_df %>%
 model_df <- model_df %>%
   filter(!is.na(cots_problem), !is.na(cots_density_cpue)) %>%
   drop_na(dplyr::all_of(pred_cols))
+```
+
+Marc: Next chunk plots the same tsv turbidity coordinates as per Sam's request on teams on 9/2/2026
+```{r tsv benth and geo classes}
+# This assumes that line 732 has been run
+sf_bg <- survey_sf %>% 
+  left_join(pred_vals, by = "ID") %>% 
+  dplyr::select(!c("ID", "X"))
+
+v_bg <- vect(sf_bg)
+              
+crs(v_bg)
+crs(turb_crop_proj)
+
+plot(v_bg,"benthic_class")
+plot(v_bg,"geomorphic_class")
+
+crs(sf_bg)
+plot(sf_bg["benthic_class"])
+plot(sf_bg["geomorphic_class"])
+
+v_bg_tsv <- crop(v_bg, turb_rast_crop)
+
+crs(v_bg_tsv)
+
+tsv_label <- data.frame(
+  lon = 146.816956,
+  lat = -19.258965,
+  label = "Townsville"
+)
+
+library(MetBrewer)
+tsv_benth <- ggplot()+
+  geom_spatvector(data = v_bg_tsv, 
+                  aes(colour = v_bg_tsv$benthic_class))+
+  geom_spatvector(data = aus_tsv)+
+  scale_colour_manual("Benthic Class", values = met.brewer("Kandinsky"))+
+  #geom_point(data = tsv_label, 
+  #           inherit.aes = F,
+  #           aes(lon, lat))+
+  theme_classic()
+
+tsv_geo <- ggplot()+
+  geom_spatvector(data = v_bg_tsv, 
+                  aes(colour = v_bg_tsv$geomorphic_class))+
+  geom_spatvector(data = aus_tsv)+
+  scale_colour_viridis_d("Geomorphic Class")+
+  #geom_point(data = tsv_label, 
+  #           inherit.aes = F,
+  #           aes(lon, lat))+
+  theme_classic()
 ```
 
 ```{r}
